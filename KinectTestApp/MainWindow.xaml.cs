@@ -24,6 +24,9 @@ namespace KinectTestApp
         public MainWindow()
         {
             InitializeComponent();
+            Uri imgUri = new Uri("C:\\dev\\KinectTestApp\\KinectTestApp\\bin\\Debug\\images\\panda.png");
+            BitmapImage head = new BitmapImage(imgUri);
+            this.imageHead1.Source = head;
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -210,6 +213,9 @@ namespace KinectTestApp
                 DepthImagePoint headDepthPoint = depth.MapFromSkeletonPoint(
                     skeleton.Joints[JointType.Head].Position
                     );
+                DepthImagePoint neckDepthPoint = depth.MapFromSkeletonPoint(
+                    skeleton.Joints[JointType.ShoulderCenter].Position
+                    );
                 DepthImagePoint leftHandDepthPoint = depth.MapFromSkeletonPoint(
                     skeleton.Joints[JointType.HandLeft].Position
                     );
@@ -220,6 +226,11 @@ namespace KinectTestApp
                 ColorImagePoint headColorPoint = depth.MapToColorImagePoint(
                     headDepthPoint.X,
                     headDepthPoint.Y,
+                    ColorImageFormat.RgbResolution640x480Fps30
+                    );
+                ColorImagePoint neckColorPoint = depth.MapToColorImagePoint(
+                    neckDepthPoint.X,
+                    neckDepthPoint.Y,
                     ColorImageFormat.RgbResolution640x480Fps30
                     );
                 ColorImagePoint leftHandColorPoint = depth.MapToColorImagePoint(
@@ -233,9 +244,10 @@ namespace KinectTestApp
                     ColorImageFormat.RgbResolution640x480Fps30
                     );
 
-                CameraPosition(circle1, headColorPoint, headDepthPoint);
-                CameraPosition(circle2, leftHandColorPoint, leftHandDepthPoint);
-                CameraPosition(circle3, rightHandColorPoint, rightHandDepthPoint);
+                //CameraPosition(circle1, headColorPoint, headDepthPoint);
+                CameraPositionImage(this.imageHead1, headColorPoint, neckColorPoint);
+                //CameraPosition(circle2, neckColorPoint, neckDepthPoint);
+                //CameraPosition(circle3, rightHandColorPoint, rightHandDepthPoint);
             }
         }
 
@@ -258,6 +270,32 @@ namespace KinectTestApp
             int diameter = 16 + (int)(normalized * (64 - 16));
             circle.Width = diameter;
             circle.Height = diameter;
+        }
+
+        void CameraPositionImage(
+            Image img,
+            ColorImagePoint headColorPoint,
+            ColorImagePoint neckColorPoint
+            )
+        {
+            // Prefer Canvas.SetLeft, but that doesn't work
+
+            if (neckColorPoint.Y <= headColorPoint.Y)
+            {
+                img.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                img.Visibility = Visibility.Visible;
+
+                int headHeight = 2 * (neckColorPoint.Y - headColorPoint.Y);
+                this.imageHead1.Height = headHeight;
+                this.imageHead1.Width = headHeight;
+
+                double left = headColorPoint.X - img.Width / 2;
+                double top = headColorPoint.Y - img.Height / 2;
+                this.imageHead1.Margin = new Thickness(left, top, 0, 0);
+            }
         }
     }
 }
