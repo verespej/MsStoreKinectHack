@@ -24,9 +24,14 @@ namespace KinectTestApp
         public MainWindow()
         {
             InitializeComponent();
-            Uri imgUri = new Uri("C:\\dev\\KinectTestApp\\KinectTestApp\\bin\\Debug\\images\\panda.png");
-            BitmapImage head = new BitmapImage(imgUri);
-            this.imageHead1.Source = head;
+
+            this.imageHead1.Source = new BitmapImage(
+                new Uri(".\\images\\frankenstein1.png", UriKind.Relative)
+                );
+
+            this.imageHead2.Source = new BitmapImage(
+                new Uri(".\\images\\panda.png", UriKind.Relative)
+                );
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -132,12 +137,33 @@ namespace KinectTestApp
                     );
             }
 
-            Skeleton skeleton = GetSkeletonFromFrame(e);
-            if (skeleton == null)
+            int i = 0;
+            using (DepthImageFrame depth = e.OpenDepthImageFrame())
             {
-                return;
+                if (depth != null)
+                {
+                    foreach (Skeleton skeleton in GetSkeletonFromFrame(e))
+                    {
+                        if (skeleton != null)
+                        {
+                            Image headImg = null;
+                            if (i == 0)
+                            {
+                                headImg = this.imageHead1;
+                            }
+                            else if (i == 1)
+                            {
+                                headImg = this.imageHead2;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                            GetCameraPoint(skeleton, depth, headImg);
+                        }
+                    }
+                }
             }
-            GetCameraPoint(skeleton, e);
         }
 
         byte[] GenerateColorFromDepth(DepthImageFrame depthFrame)
@@ -181,74 +207,70 @@ namespace KinectTestApp
             return (byte)(255 * normalized);
         }
 
-        Skeleton GetSkeletonFromFrame(AllFramesReadyEventArgs e)
+        IEnumerable<Skeleton> GetSkeletonFromFrame(AllFramesReadyEventArgs e)
         {
             using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
             {
-                if (skeletonFrame == null)
+                if (skeletonFrame != null)
                 {
-                    return null;
+                    skeletonFrame.CopySkeletonDataTo(_allSkeletons);
+
+                    IEnumerable<Skeleton> selection = _allSkeletons.Where(s =>
+                    {
+                        return s.TrackingState == SkeletonTrackingState.Tracked;
+                    });
+
+                    if (selection != null)
+                    {
+                        foreach (Skeleton skeleton in selection)
+                        {
+                            yield return skeleton;
+                        }
+                    }
                 }
-
-                skeletonFrame.CopySkeletonDataTo(_allSkeletons);
-
-                Skeleton first = _allSkeletons.FirstOrDefault(s =>
-                {
-                    return s.TrackingState == SkeletonTrackingState.Tracked;
-                });
-
-                return first;
             }
         }
 
-        void GetCameraPoint(Skeleton skeleton, AllFramesReadyEventArgs e)
+        void GetCameraPoint(Skeleton skeleton, DepthImageFrame depth, Image headImg)
         {
-            using (DepthImageFrame depth = e.OpenDepthImageFrame())
-            {
-                if (depth == null)
-                {
-                    return;
-                }
+            DepthImagePoint headDepthPoint = depth.MapFromSkeletonPoint(
+                skeleton.Joints[JointType.Head].Position
+                );
+            DepthImagePoint neckDepthPoint = depth.MapFromSkeletonPoint(
+                skeleton.Joints[JointType.ShoulderCenter].Position
+                );
+            DepthImagePoint leftHandDepthPoint = depth.MapFromSkeletonPoint(
+                skeleton.Joints[JointType.HandLeft].Position
+                );
+            DepthImagePoint rightHandDepthPoint = depth.MapFromSkeletonPoint(
+                skeleton.Joints[JointType.HandRight].Position
+                );
 
-                DepthImagePoint headDepthPoint = depth.MapFromSkeletonPoint(
-                    skeleton.Joints[JointType.Head].Position
-                    );
-                DepthImagePoint neckDepthPoint = depth.MapFromSkeletonPoint(
-                    skeleton.Joints[JointType.ShoulderCenter].Position
-                    );
-                DepthImagePoint leftHandDepthPoint = depth.MapFromSkeletonPoint(
-                    skeleton.Joints[JointType.HandLeft].Position
-                    );
-                DepthImagePoint rightHandDepthPoint = depth.MapFromSkeletonPoint(
-                    skeleton.Joints[JointType.HandRight].Position
-                    );
+            ColorImagePoint headColorPoint = depth.MapToColorImagePoint(
+                headDepthPoint.X,
+                headDepthPoint.Y,
+                ColorImageFormat.RgbResolution640x480Fps30
+                );
+            ColorImagePoint neckColorPoint = depth.MapToColorImagePoint(
+                neckDepthPoint.X,
+                neckDepthPoint.Y,
+                ColorImageFormat.RgbResolution640x480Fps30
+                );
+            ColorImagePoint leftHandColorPoint = depth.MapToColorImagePoint(
+                leftHandDepthPoint.X,
+                leftHandDepthPoint.Y,
+                ColorImageFormat.RgbResolution640x480Fps30
+                );
+            ColorImagePoint rightHandColorPoint = depth.MapToColorImagePoint(
+                rightHandDepthPoint.X,
+                rightHandDepthPoint.Y,
+                ColorImageFormat.RgbResolution640x480Fps30
+                );
 
-                ColorImagePoint headColorPoint = depth.MapToColorImagePoint(
-                    headDepthPoint.X,
-                    headDepthPoint.Y,
-                    ColorImageFormat.RgbResolution640x480Fps30
-                    );
-                ColorImagePoint neckColorPoint = depth.MapToColorImagePoint(
-                    neckDepthPoint.X,
-                    neckDepthPoint.Y,
-                    ColorImageFormat.RgbResolution640x480Fps30
-                    );
-                ColorImagePoint leftHandColorPoint = depth.MapToColorImagePoint(
-                    leftHandDepthPoint.X,
-                    leftHandDepthPoint.Y,
-                    ColorImageFormat.RgbResolution640x480Fps30
-                    );
-                ColorImagePoint rightHandColorPoint = depth.MapToColorImagePoint(
-                    rightHandDepthPoint.X,
-                    rightHandDepthPoint.Y,
-                    ColorImageFormat.RgbResolution640x480Fps30
-                    );
-
-                //CameraPosition(circle1, headColorPoint, headDepthPoint);
-                CameraPositionImage(this.imageHead1, headColorPoint, neckColorPoint);
-                //CameraPosition(circle2, neckColorPoint, neckDepthPoint);
-                //CameraPosition(circle3, rightHandColorPoint, rightHandDepthPoint);
-            }
+            CameraPositionImage(headImg, headColorPoint, neckColorPoint);
+            //CameraPosition(circle1, headColorPoint, headDepthPoint);
+            //CameraPosition(circle2, neckColorPoint, neckDepthPoint);
+            //CameraPosition(circle3, rightHandColorPoint, rightHandDepthPoint);
         }
 
         void CameraPosition(
@@ -289,12 +311,12 @@ namespace KinectTestApp
                 img.Visibility = Visibility.Visible;
 
                 int headHeight = 2 * (neckColorPoint.Y - headColorPoint.Y);
-                this.imageHead1.Height = headHeight;
-                this.imageHead1.Width = headHeight;
+                img.Height = headHeight;
+                img.Width = headHeight;
 
                 double left = headColorPoint.X - img.Width / 2;
                 double top = headColorPoint.Y - img.Height / 2;
-                this.imageHead1.Margin = new Thickness(left, top, 0, 0);
+                img.Margin = new Thickness(left, top, 0, 0);
             }
         }
     }
