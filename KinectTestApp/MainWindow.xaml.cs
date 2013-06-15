@@ -1,18 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Microsoft.Kinect;
+using System;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using Microsoft.Kinect;
 
 namespace KinectTestApp
 {
@@ -20,16 +12,20 @@ namespace KinectTestApp
     {
         const int SkeletonCount = 6;
         Skeleton[] _allSkeletons = new Skeleton[SkeletonCount];
+        Image[] _headImages = null;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            this.imageHead1.Source = new BitmapImage(
+            _headImages = new Image[2];
+            _headImages[0] = this.imageHead1;
+            _headImages[1] = this.imageHead2;
+
+            _headImages[0].Source = new BitmapImage(
                 new Uri(".\\images\\frankenstein1.png", UriKind.Relative)
                 );
-
-            this.imageHead2.Source = new BitmapImage(
+            _headImages[1].Source = new BitmapImage(
                 new Uri(".\\images\\panda.png", UriKind.Relative)
                 );
         }
@@ -113,6 +109,9 @@ namespace KinectTestApp
                     );
             }*/
 
+            // 
+            // Render captured image
+            // 
             using (ColorImageFrame colorFrame = e.OpenColorImageFrame())
             {
                 if (colorFrame == null)
@@ -137,34 +136,88 @@ namespace KinectTestApp
                     );
             }
 
-            int i = 0;
-            using (DepthImageFrame depth = e.OpenDepthImageFrame())
+            // 
+            // Render players
+            // 
+            using (DepthImageFrame depthFrame = e.OpenDepthImageFrame())
             {
-                if (depth != null)
+                if (depthFrame != null)
                 {
-                    foreach (Skeleton skeleton in GetSkeletonFromFrame(e))
+                    using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
                     {
-                        if (skeleton != null)
+                        Player[] players = GetPlayers(depthFrame, skeletonFrame);
+                        foreach (Player player in players)
                         {
-                            Image headImg = null;
-                            if (i == 0)
-                            {
-                                headImg = this.imageHead1;
-                            }
-                            else if (i == 1)
-                            {
-                                headImg = this.imageHead2;
-                            }
-                            else
-                            {
-                                break;
-                            }
-                            GetCameraPoint(skeleton, depth, headImg);
+                            ColorImagePoint headPoint = player.GetCameraPoint(JointType.Head);
+                            ColorImagePoint neckPoint = player.GetCameraPoint(JointType.ShoulderCenter);
+                            CameraPositionImage(player.HeadImage, headPoint, neckPoint);
                         }
                     }
                 }
             }
         }
+
+        Player[] GetPlayers(DepthImageFrame depth, SkeletonFrame skeletonFrame)
+        {
+            if (depth == null || skeletonFrame == null)
+            {
+                return null;
+            }
+
+            skeletonFrame.CopySkeletonDataTo(_allSkeletons);
+            int trackedCount = _allSkeletons.Count(s =>
+            {
+                return s.TrackingState == SkeletonTrackingState.Tracked;
+            });
+
+            if (trackedCount < 1)
+            {
+                return new Player[0];
+            }
+
+            if (_headImages.Length < trackedCount)
+            {
+                throw new IndexOutOfRangeException("Not enough head images for number of tracked skeletons");
+            }
+
+            Player[] players = new Player[trackedCount];
+            int playerIndex = 0;
+            for (int i = 0; i < _allSkeletons.Length; i++)
+            {
+                if (_allSkeletons[i].TrackingState == SkeletonTrackingState.Tracked)
+                {
+                    players[playerIndex] = new Player(_allSkeletons[i], depth, _headImages[playerIndex]);
+                    playerIndex++;
+                }
+            }
+
+            return players;
+        }
+
+        void CameraPositionImage(
+            Image img,
+            ColorImagePoint headColorPoint,
+            ColorImagePoint neckColorPoint
+            )
+        {
+            if (neckColorPoint.Y <= headColorPoint.Y)
+            {
+                img.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                img.Visibility = Visibility.Visible;
+
+                int headHeight = 2 * (neckColorPoint.Y - headColorPoint.Y);
+                img.Height = headHeight;
+                img.Width = headHeight;
+
+                double left = headColorPoint.X - img.Width / 2;
+                double top = headColorPoint.Y - img.Height / 2;
+                img.Margin = new Thickness(left, top, 0, 0);
+            }
+        }
+        
 
         byte[] GenerateColorFromDepth(DepthImageFrame depthFrame)
         {
@@ -205,119 +258,6 @@ namespace KinectTestApp
 
             float normalized = (float)adjusted / (float)max;
             return (byte)(255 * normalized);
-        }
-
-        IEnumerable<Skeleton> GetSkeletonFromFrame(AllFramesReadyEventArgs e)
-        {
-            using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
-            {
-                if (skeletonFrame != null)
-                {
-                    skeletonFrame.CopySkeletonDataTo(_allSkeletons);
-
-                    IEnumerable<Skeleton> selection = _allSkeletons.Where(s =>
-                    {
-                        return s.TrackingState == SkeletonTrackingState.Tracked;
-                    });
-
-                    if (selection != null)
-                    {
-                        foreach (Skeleton skeleton in selection)
-                        {
-                            yield return skeleton;
-                        }
-                    }
-                }
-            }
-        }
-
-        void GetCameraPoint(Skeleton skeleton, DepthImageFrame depth, Image headImg)
-        {
-            DepthImagePoint headDepthPoint = depth.MapFromSkeletonPoint(
-                skeleton.Joints[JointType.Head].Position
-                );
-            DepthImagePoint neckDepthPoint = depth.MapFromSkeletonPoint(
-                skeleton.Joints[JointType.ShoulderCenter].Position
-                );
-            DepthImagePoint leftHandDepthPoint = depth.MapFromSkeletonPoint(
-                skeleton.Joints[JointType.HandLeft].Position
-                );
-            DepthImagePoint rightHandDepthPoint = depth.MapFromSkeletonPoint(
-                skeleton.Joints[JointType.HandRight].Position
-                );
-
-            ColorImagePoint headColorPoint = depth.MapToColorImagePoint(
-                headDepthPoint.X,
-                headDepthPoint.Y,
-                ColorImageFormat.RgbResolution640x480Fps30
-                );
-            ColorImagePoint neckColorPoint = depth.MapToColorImagePoint(
-                neckDepthPoint.X,
-                neckDepthPoint.Y,
-                ColorImageFormat.RgbResolution640x480Fps30
-                );
-            ColorImagePoint leftHandColorPoint = depth.MapToColorImagePoint(
-                leftHandDepthPoint.X,
-                leftHandDepthPoint.Y,
-                ColorImageFormat.RgbResolution640x480Fps30
-                );
-            ColorImagePoint rightHandColorPoint = depth.MapToColorImagePoint(
-                rightHandDepthPoint.X,
-                rightHandDepthPoint.Y,
-                ColorImageFormat.RgbResolution640x480Fps30
-                );
-
-            CameraPositionImage(headImg, headColorPoint, neckColorPoint);
-            //CameraPosition(circle1, headColorPoint, headDepthPoint);
-            //CameraPosition(circle2, neckColorPoint, neckDepthPoint);
-            //CameraPosition(circle3, rightHandColorPoint, rightHandDepthPoint);
-        }
-
-        void CameraPosition(
-            Ellipse circle,
-            ColorImagePoint colorPoint,
-            DepthImagePoint depthPoint
-            )
-        {
-            // Prefer Canvas.SetLeft, but that doesn't work
-
-            double left = colorPoint.X - circle.Width / 2;
-            double top = colorPoint.Y - circle.Height / 2;
-            circle.Margin = new Thickness(left, top, 0, 0);
-
-            // min = 800, max = 4000
-            int depth = Math.Max(depthPoint.Depth, 800);
-            depth = Math.Min(depth, 4000);
-            double normalized = 1.0 - ((double)depth / (4000.0 - 800.0));
-            int diameter = 16 + (int)(normalized * (64 - 16));
-            circle.Width = diameter;
-            circle.Height = diameter;
-        }
-
-        void CameraPositionImage(
-            Image img,
-            ColorImagePoint headColorPoint,
-            ColorImagePoint neckColorPoint
-            )
-        {
-            // Prefer Canvas.SetLeft, but that doesn't work
-
-            if (neckColorPoint.Y <= headColorPoint.Y)
-            {
-                img.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                img.Visibility = Visibility.Visible;
-
-                int headHeight = 2 * (neckColorPoint.Y - headColorPoint.Y);
-                img.Height = headHeight;
-                img.Width = headHeight;
-
-                double left = headColorPoint.X - img.Width / 2;
-                double top = headColorPoint.Y - img.Height / 2;
-                img.Margin = new Thickness(left, top, 0, 0);
-            }
         }
     }
 }

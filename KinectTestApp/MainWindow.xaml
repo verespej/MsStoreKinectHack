@@ -7,9 +7,6 @@
 
         <WpfViewers:KinectSensorChooser x:Name="kinectSensorChooser" HorizontalAlignment="Left" Margin="164,123,0,0" VerticalAlignment="Top"/>
         <Image x:Name="imageDisplay" HorizontalAlignment="Left" Height="480" VerticalAlignment="Top" Width="640"/>
-        <Ellipse x:Name="circle1" Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="36" Margin="10,424,0,0" Stroke="Black" VerticalAlignment="Top" Width="36" RenderTransformOrigin="-0.875,0.667"/>
-        <Ellipse x:Name="circle2" Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="36" Margin="51,424,0,0" Stroke="Black" VerticalAlignment="Top" Width="36" RenderTransformOrigin="0.194,-0.417"/>
-        <Ellipse x:Name="circle3" Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="36" Margin="92,424,0,0" Stroke="Black" VerticalAlignment="Top" Width="36" RenderTransformOrigin="1.861,0.208"/>
         <Image x:Name="imageHead1" HorizontalAlignment="Left" Height="100" Margin="522,10,0,0" VerticalAlignment="Top" Width="100"/>
         <Image x:Name="imageHead2" HorizontalAlignment="Left" Height="100" Margin="522,115,0,0" VerticalAlignment="Top" Width="100"/>
 
