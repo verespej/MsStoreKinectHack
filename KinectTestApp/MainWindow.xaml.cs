@@ -5,14 +5,37 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.IO;
+using System.Threading;
+using HeadAnimation;
 
 namespace KinectTestApp
 {
     public partial class MainWindow : Window
     {
+        private Stream audioStream;
+        private bool reading;
+        private Thread readingThread;
+        private int currentFrame = 0;
+
         const int SkeletonCount = 6;
         Skeleton[] _allSkeletons = new Skeleton[SkeletonCount];
         Image[] _headImages = null;
+
+        ImageSource[][] animationFrames = new ImageSource[][] {
+            new ImageSource[] {
+                new BitmapImage(new Uri("images/pirate4.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/pirate3.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/pirate2.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/pirate1.png", UriKind.Relative)),
+            },
+            new ImageSource[] {
+                new BitmapImage(new Uri("images/frankenstein4.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/frankenstein3.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/frankenstein2.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/frankenstein1.png", UriKind.Relative)),
+            }
+        };
 
         public MainWindow()
         {
@@ -22,12 +45,8 @@ namespace KinectTestApp
             _headImages[0] = this.imageHead1;
             _headImages[1] = this.imageHead2;
 
-            _headImages[0].Source = new BitmapImage(
-                new Uri(".\\images\\frankenstein1.png", UriKind.Relative)
-                );
-            _headImages[1].Source = new BitmapImage(
-                new Uri(".\\images\\panda.png", UriKind.Relative)
-                );
+            _headImages[0].Source = animationFrames[0][0];
+            _headImages[1].Source = animationFrames[1][0];
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -61,6 +80,78 @@ namespace KinectTestApp
                     // Another app is trying to read its data
                     this.kinectSensorChooser.AppConflictOccurred();
                 }
+
+                this.reading = true;
+                this.audioStream = newSensor.AudioSource.Start();
+
+                this.readingThread = new Thread(AudioReadingThread);
+                this.readingThread.Start();
+            }
+        }
+
+        private void UpdateAnimation(float energy)
+        {
+            ImageSource[] frames = animationFrames[0];
+
+            int index = 0;
+
+            if (energy <= 0.1)
+            {
+                index = 0;
+            }
+            else if (energy >= 0.9)
+            {
+                index = frames.Length - 1;
+            }
+            else
+            {
+                index = (int)((energy - 0.2) * (frames.Length - 1)) + 1;
+            }
+
+            if (index != currentFrame)
+            {
+                currentFrame = index;
+                _headImages[0].Source = frames[currentFrame];
+            }
+        }
+
+        private void AudioReadingThread()
+        {
+            try
+            {
+                const int AudioPollingInterval = 33;
+                const int SamplesPerMillisecond = 16;
+                const int BytesPerSample = 2;
+
+                byte[] audioBuffer = new byte[AudioPollingInterval * SamplesPerMillisecond * BytesPerSample];
+
+                LipSync lipSync = new LipSync(1, 1.0 / 30.0);
+                lipSync.OnMouthChanged += delegate(float normalizedEnergy)
+                {
+                    Dispatcher.BeginInvoke(
+                        new Action(
+                            () =>
+                            {
+                                UpdateAnimation(normalizedEnergy);
+                            }
+                        )
+                    );
+                };
+
+                AudioEnergyFilter audioFilter = new AudioEnergyFilter(16000, 1, 30, 0);
+                audioFilter.OnAudioEnergyAvailable += delegate(double time, float normalizedEnergy)
+                {
+                    lipSync.ProcessEnergy(normalizedEnergy);
+                };
+
+                while (this.reading)
+                {
+                    int readCount = audioStream.Read(audioBuffer, 0, audioBuffer.Length);
+                    audioFilter.ProcessAudio(audioBuffer, readCount);
+                }
+            }
+            catch (Exception)
+            {
             }
         }
 
@@ -73,6 +164,15 @@ namespace KinectTestApp
                 {
                     sensor.AudioSource.Stop();
                 }
+
+                this.reading = false;
+                if (readingThread.IsAlive)
+                {
+                    readingThread.Interrupt();
+                    readingThread.Join();
+                }
+
+                readingThread = null;
             }
         }
 
