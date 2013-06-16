@@ -47,6 +47,10 @@ namespace KinectTestApp
 
             _headImages[0].Source = animationFrames[0][0];
             _headImages[1].Source = animationFrames[1][0];
+
+            this.collisionImage1.Source = new BitmapImage(
+                new Uri(".\\images\\POW.png", UriKind.Relative)
+                );
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -246,11 +250,24 @@ namespace KinectTestApp
                     using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
                     {
                         Player[] players = GetPlayers(depthFrame, skeletonFrame);
-                        foreach (Player player in players)
+                        if (players != null)
                         {
-                            ColorImagePoint headPoint = player.GetCameraPoint(JointType.Head);
-                            ColorImagePoint neckPoint = player.GetCameraPoint(JointType.ShoulderCenter);
-                            CameraPositionImage(player.HeadImage, headPoint, neckPoint);
+                            foreach (Player player in players)
+                            {
+                                ColorImagePoint headPoint = player.GetCameraPoint(JointType.Head);
+                                ColorImagePoint neckPoint = player.GetCameraPoint(JointType.ShoulderCenter);
+                                CameraPositionImage(player.HeadImage, headPoint, neckPoint);
+                                ColorImagePoint collision = player.GetCollisions(players).FirstOrDefault();
+                                if (collision.X == 0 && collision.Y == 0)
+                                {
+                                    collisionImage1.Visibility = Visibility.Collapsed;
+                                }
+                                else
+                                {
+                                    collisionImage1.Visibility = Visibility.Visible;
+                                    CameraPositionImage(collisionImage1, collision);
+                                }
+                            }
                         }
                     }
                 }
@@ -316,6 +333,18 @@ namespace KinectTestApp
                 double top = headColorPoint.Y - img.Height / 2;
                 img.Margin = new Thickness(left, top, 0, 0);
             }
+        }
+
+        void CameraPositionImage(
+            Image img,
+            ColorImagePoint headColorPoint
+            )
+        {
+            img.Visibility = Visibility.Visible;
+
+            double left = headColorPoint.X - img.Width / 2;
+            double top = headColorPoint.Y - img.Height / 2;
+            img.Margin = new Thickness(left, top, 0, 0);
         }
         
 

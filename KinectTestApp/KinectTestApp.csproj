@@ -111,10 +111,21 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="images\frankenstein1.png" />
-    <Resource Include="images\frankenstein2.png" />
-    <Resource Include="images\frankenstein3.png" />
-    <Resource Include="images\frankenstein4.png" />
+    <Content Include="images\POW.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="images\frankenstein1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="images\frankenstein2.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="images\frankenstein3.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="images\frankenstein4.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="images\panda.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
