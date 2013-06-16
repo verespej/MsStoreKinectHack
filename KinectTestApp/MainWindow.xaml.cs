@@ -17,12 +17,28 @@ namespace KinectTestApp
         private bool reading;
         private Thread readingThread;
         private int currentFrame = 0;
+        private bool handsRaised = false;
+        private DateTime lastHandsChangeTime = DateTime.Now;
 
         const int SkeletonCount = 6;
         Skeleton[] _allSkeletons = new Skeleton[SkeletonCount];
         Image[] _headImages = null;
 
+        int talkingImageIndex = 0;
+
         ImageSource[][] animationFrames = new ImageSource[][] {
+            new ImageSource[] {
+                new BitmapImage(new Uri("images/unicorn4.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/unicorn3.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/unicorn2.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/unicorn1.png", UriKind.Relative)),
+            },
+            new ImageSource[] {
+                new BitmapImage(new Uri("images/lion4.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/lion3.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/lion2.png", UriKind.Relative)),
+                new BitmapImage(new Uri("images/lion1.png", UriKind.Relative)),
+            },
             new ImageSource[] {
                 new BitmapImage(new Uri("images/pirate4.png", UriKind.Relative)),
                 new BitmapImage(new Uri("images/pirate3.png", UriKind.Relative)),
@@ -37,6 +53,10 @@ namespace KinectTestApp
             }
         };
 
+        int[] headImageIndexes = new int[] {
+            0, 1
+        };
+
         public MainWindow()
         {
             InitializeComponent();
@@ -45,12 +65,17 @@ namespace KinectTestApp
             _headImages[0] = this.imageHead1;
             _headImages[1] = this.imageHead2;
 
-            _headImages[0].Source = animationFrames[0][0];
-            _headImages[1].Source = animationFrames[1][0];
-
             this.collisionImage1.Source = new BitmapImage(
                 new Uri(".\\images\\POW.png", UriKind.Relative)
                 );
+        }
+
+        private void UpdateImages()
+        {
+            _headImages[0].Source = animationFrames[headImageIndexes[0]][0];
+            _headImages[1].Source = animationFrames[headImageIndexes[1]][0];
+
+            _headImages[talkingImageIndex].Source = animationFrames[headImageIndexes[talkingImageIndex]][currentFrame];
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -95,7 +120,7 @@ namespace KinectTestApp
 
         private void UpdateAnimation(float energy)
         {
-            ImageSource[] frames = animationFrames[0];
+            ImageSource[] frames = animationFrames[headImageIndexes[talkingImageIndex]];
 
             int index = 0;
 
@@ -115,7 +140,8 @@ namespace KinectTestApp
             if (index != currentFrame)
             {
                 currentFrame = index;
-                _headImages[0].Source = frames[currentFrame];
+
+                UpdateImages();
             }
         }
 
@@ -178,6 +204,14 @@ namespace KinectTestApp
 
                 readingThread = null;
             }
+        }
+
+        void ToggleImages()
+        {
+            headImageIndexes[0] = (headImageIndexes[0] + 1) % animationFrames.Length;
+            headImageIndexes[1] = (headImageIndexes[1] + 1) % animationFrames.Length;
+
+            talkingImageIndex = (talkingImageIndex + 1) % _headImages.Length;
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -250,8 +284,22 @@ namespace KinectTestApp
                     using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
                     {
                         Player[] players = GetPlayers(depthFrame, skeletonFrame);
-                        if (players != null)
+                        if (players != null && players.Length > 0)
                         {
+                            var now = DateTime.Now;
+                            if (now.Subtract(lastHandsChangeTime).TotalMilliseconds > 1000) {
+                                bool raisedNow = players[0].AreBothHandsRaised();
+                                if (raisedNow != handsRaised) {
+                                    handsRaised = raisedNow;
+                                    lastHandsChangeTime = now;
+
+                                    if (handsRaised)
+                                    {
+                                        ToggleImages();
+                                    }
+                                }
+                            }
+
                             foreach (Player player in players)
                             {
                                 ColorImagePoint headPoint = player.GetCameraPoint(JointType.Head);

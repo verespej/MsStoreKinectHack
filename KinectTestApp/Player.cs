@@ -22,6 +22,19 @@ namespace KinectTestApp
             _headImage = headImage;
         }
 
+        public bool AreBothHandsRaised()
+        {
+            var wristLeft = _skeleton.Joints[JointType.WristLeft];
+            var wristRight = _skeleton.Joints[JointType.WristRight];
+            var head = _skeleton.Joints[JointType.Head];
+
+            return wristLeft.TrackingState != JointTrackingState.NotTracked &&
+                wristRight.TrackingState != JointTrackingState.NotTracked &&
+                head.TrackingState != JointTrackingState.NotTracked &&
+                wristLeft.Position.Y > head.Position.Y &&
+                wristRight.Position.Y > head.Position.Y;
+        }
+
         public ColorImagePoint GetCameraPoint(JointType jt)
         {
             DepthImagePoint dip = _depth.MapFromSkeletonPoint(

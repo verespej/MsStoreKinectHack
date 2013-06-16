@@ -126,6 +126,10 @@
     <Content Include="images\frankenstein4.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Resource Include="images\lion1.png" />
+    <Resource Include="images\lion2.png" />
+    <Resource Include="images\lion3.png" />
+    <Resource Include="images\lion4.png" />
     <Content Include="images\panda.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
